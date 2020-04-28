@@ -1,24 +1,28 @@
 #!/usr/bin/env python
 
+# Python 2/3 compatibility imports
 from __future__ import print_function
-from builtins import str
-from builtins import range
+from six.moves import range
+
+# standard library imports
+import json
+import time
+
+# local module imports
 from blinker import signal
-import web, json, time
 import gv  # Get access to SIP's settings, gv = global variables
-from urls import urls  # Get access to SIP's URLs
 from sip import template_render
+from urls import urls  # Get access to SIP's URLs
+import web
 from webpages import ProtectedPage
 
 # Load the Raspberry Pi GPIO (General Purpose Input Output) library
 try:
     if gv.use_pigpio:
         import pigpio
-
         pi = pigpio.pi()
     else:
         import RPi.GPIO as GPIO
-
         pi = 0
 except IOError:
     pass
@@ -169,10 +173,10 @@ class update(ProtectedPage):
         qdict = web.input()
         changed = False
         if params[u"enabled"] != (qdict[u"enabled"]):
-            params[u"enabled"] = qdictu[u"enabled"]
+            params[u"enabled"] = qdict[u"enabled"]
             changed = True
         if params[u"relays"] != int(
-            qdictu["relays"]
+            qdict[u"relays"]
         ):  # if the number of relay channels changed, update the params
             params[u"relays"] = int(qdict[u"relays"])
             changed = True

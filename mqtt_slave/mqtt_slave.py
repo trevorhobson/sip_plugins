@@ -1,22 +1,25 @@
 # !/usr/bin/env python
 
-from __future__ import print_function
-
 """ SIP plugin uses mqtt plugin to receive station status data over MQTT and control local stations
-"""
 __author__ = "Orginally written by Daniel Casner <daniel@danielcasner.org> Modified from mqtt_schedule by Dan K."
+"""
 
-from builtins import range
-import web  # web.py framework
-import gv  # Get access to SIP's settings
-from urls import urls  # Get access to SIP's URLs
-from sip import template_render  #  Needed for working with web.py templates
-from webpages import ProtectedPage  # Needed for security
 
-# # from gpio_pins import set_output
+# Python 2/3 compatibility imports
+from __future__ import print_function
+from six.moves import range
+
+# standard library imports
 import json  # for working with data file
-from plugins import mqtt
 from time import sleep
+
+# local module imports
+import gv  # Get access to SIP's settings
+from plugins import mqtt
+from sip import template_render  #  Needed for working with web.py templates
+from urls import urls  # Get access to SIP's URLs
+import web  # web.py framework
+from webpages import ProtectedPage  # Needed for security
 
 DATA_FILE = "./data/mqtt.json"
 

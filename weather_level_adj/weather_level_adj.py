@@ -1,28 +1,31 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Python 2/3 compatibility imports
 from __future__ import print_function
 from __future__ import division
-from builtins import next
-from builtins import str
+from six import next
+
+# standard library imports
 import datetime
-from threading import Thread
-import sys
-import traceback
-import json
-import time
-import re
-import os
-# import urllib2
-import urllib.request, urllib.error, urllib.parse
 import errno
+import json
+import os
+import re
+import sys
+from threading import Thread
+import time
+import traceback
+try:
+    from urllib.request import urlopen, Request
+except ImportError:
+    from six.moves.urllib.request import urlopen, Request
 
-import web
+# local module imports
 import gv  # Get access to SIP's settings
-from urls import urls  # Get access to SIP's URLs
-
-# from sip import template_render            altered this to show the webpage for further functionality changes. I guess it works....?
 from sip import template_render
+from urls import urls  # Get access to SIP's URLs
+import web
 from webpages import ProtectedPage
 
 
@@ -30,6 +33,7 @@ def safe_float(s):
     """
     Return a valid float regardless of input.
     """
+#     print("safe_float param is: ", s)
     try:
         return float(s)
     except TypeError:
@@ -61,11 +65,11 @@ urls.extend(
 # fmt: on
 
 # Add this plugin to the home page plugins menu
-gv.plugin_menu.append([u"Weather-based Water Level", u"/lwa"])
+gv.plugin_menu.append([_(u"Weather-based Water Level"), u"/lwa"])
 
 lwa_options = {}
 lwa_decipher = {}
-prior = {u"temp_cutoff": 0, u"water_needed": 0}
+prior = {u"temp_cutoff": 0, u"water_needed": 0, u"daily_irrigation": 0}
 
 
 ################################################################################
@@ -93,7 +97,7 @@ class WeatherLevelChecker(Thread):
             self.status = msg
         if msg:
             lwa_options[u"status"] = self.status
-        print(msg)
+        print(msg.encode('utf-8'))
 
     def update(self):
         self._sleep_time = 0
@@ -105,8 +109,8 @@ class WeatherLevelChecker(Thread):
             self._sleep_time -= 1
 
     def run(self):
-        time.sleep(3)  # Sleep some time to prevent printing before startup information
-
+        time.sleep(4)  # Sleep some time to prevent printing before startup information
+        
         while True:
             try:
                 self.status = ""
@@ -115,7 +119,7 @@ class WeatherLevelChecker(Thread):
                     if u"wl_weather" in gv.sd:
                         del gv.sd[u"wl_weather"]
                 else:
-                    print(u"Checking weather status...")
+                    print((_(u"Checking weather status") + "...").encode('utf-8'))
                     today = today_info(self, options)
                     forecast = forecast_info(self, options, today)
                     history = history_info(self, today, options)
@@ -150,7 +154,7 @@ class WeatherLevelChecker(Thread):
                     # We calculate what we will need to provide using the mean data of X days around today
 
                     ini_water_needed = water_needed = (
-                        int(options[u"daily_irrigation"])
+                        float(options[u"daily_irrigation"])
                         * (int(options[u"days_forecast"]))
                         + 1
                     )  # 4mm per day
@@ -164,8 +168,6 @@ class WeatherLevelChecker(Thread):
                         1 - (total_info[u"humidity"] - 50) / 200.0
                     )  # 0 => 125%, 100 => 75%
                     water_needed = round(water_needed, 1)
-                    print(u"water needed: ", water_needed)
-
                     water_left = water_needed - total_info[u"rain_mm"]
                     water_left = round(max(0, min(100, water_left)), 1)
 
@@ -180,27 +182,27 @@ class WeatherLevelChecker(Thread):
                     if (
                         safe_float(today[u"temp_c"])
                         <= safe_float(options[u"temp_cutoff"])
-                    ) and options[u"temp_cutoff_enable"] == u"on":
+                        and options[u"temp_cutoff_enable"] == u"on"):
                         water_adjustment = 0
                     if lwa_options[u"units"] == u"US":
                         self.add_status(
-                            u"Current temperature   : {}deg.{}".format(
+                            _(u"Current temperature") + u":" + u"\n{}deg.{}".format(
                                 to_f(today[u"temp_c"]), u"F"
                             )
                         )
-                        self.add_status("________________________________")
+                        self.add_status(u"________________________________")
                         self.add_status(
-                            u"Daily irrigation      : {}{}".format(
+                            _(u"Daily irrigation") + u":" + u"\n{}{}".format(
                                 to_in(safe_float(options[u"daily_irrigation"])), u"in"
                             )
                         )
                         self.add_status(
-                            u"Total rainfall        : {}{}".format(
+                            _(u"Total rainfall") + u":" + u"\n{}{}".format(
                                 to_in(total_info[u"rain_mm"]), u"in"
                             )
                         )
                         self.add_status(
-                            u"Water needed ({}days)  : {}{}".format(
+                            (_(u"Water needed") + u"({}" + _(u"days)") + u":"  + u"\n{}{}").format(
                                 int(options[u"days_forecast"]) + 1,
                                 to_in(water_needed),
                                 u"in",
@@ -208,45 +210,46 @@ class WeatherLevelChecker(Thread):
                         )
                         self.add_status(u"________________________________")
                         self.add_status(
-                            u"Irrigation needed     : {}{}".format(
+                            _(u"Irrigation needed") + u":" + u"\n{}{}".format(
                                 to_in(water_left), u"in"
                             )
                         )
                         self.add_status(
-                            u"Weather Adjustment    : {}{}".format(
+                            _(u"Weather Adjustment") + u":" + u"\n{}{}".format(
                                 water_adjustment, u"%"
                             )
                         )
                     else:
                         self.add_status(
-                            u"Current temperature   : {}deg.{}".format(
+                            _(u"Current temperature") + u":"  + u"\n{}deg.{}".format(
                                 round(today[u"temp_c"], 1), "C"
                             )
                         )
                         self.add_status(u"________________________________")
                         self.add_status(
-                            u"Daily irrigation      : {}{}".format(
+                            _(u"Daily irrigation") + u":"  + u"\n{}{}".format(
                                 safe_float(options[u"daily_irrigation"]), u"mm"
                             )
                         )
                         self.add_status(
-                            u"Total rainfall        : {}{}".format(
+                            _(u"Total rainfall") + u":"  + u"\n{}{}".format(
                                 safe_float(total_info[u"rain_mm"]), u"mm"
                             )
                         )
                         self.add_status(
-                            u"Water needed ({}days)  : {}{}".format(
-                                safe_float(options[u"days_forecast"]) + 1, water_needed, u"mm"
+                            (_(u"Water needed") + u" ({}" + _(u"days)") + u":"  + u"\n{}{}").format(
+                                int(options[u"days_forecast"]) + 1, 
+                                water_needed, u"mm"
                             )
                         )
                         self.add_status(u"________________________________")
                         self.add_status(
-                            u"Irrigation needed     : {}{}".format(
+                            _(u"Irrigation needed") + u":"  + u"\n{}{}".format(
                                 safe_float(water_left), u"mm"
                             )
                         )
                         self.add_status(
-                            u"Weather Adjustment    : {}{}".format(
+                            _(u"Weather Adjustment") + u":" + u"\n{}{}".format(
                                 water_adjustment, u"%"
                             )
                         )
@@ -261,7 +264,7 @@ class WeatherLevelChecker(Thread):
                     traceback.format_exception(exc_type, exc_value, exc_traceback)
                 )
                 self.add_status(
-                    u"Weather-based water level encountered error:\n" + err_string
+                    _(u"Weather-based water level encountered error") + u":\n" + err_string
                 )
                 self._sleep(3600)
             time.sleep(0.5)
@@ -334,21 +337,22 @@ class update(ProtectedPage):
                 qdict[u"temp_cutoff"] = float(lwa_options[u"temp_cutoff"])  #  No change
 
             per_day_setting = round(
-                safe_float(qdict[u"daily_irrigation"]) * 25.4, 1
+                float(qdict[u"daily_irrigation"]) * 25.4, 2
             )  # inches to mm
+            qdict[u"daily_irrigation"] = per_day_setting
             if prior[u"water_needed"] != per_day_setting:
                 prior[u"water_needed"] = per_day_setting
                 qdict[u"water_needed"] = per_day_setting
             else:
                 qdict[u"water_needed"] = safe_float(lwa_options[u"daily_irrigation"])  # No change
 
+        print(u"qdict: ", qdict)
         for (
             key,
             value,
         ) in list(qdict.items()):  # Convert format from storage to dictionary
             if key in qdict:
                 lwa_options[key] = value
-        print(u"lwa_options: ", lwa_options)
         lwa_options[u"status"] = u""  #  clear any existing text.
         if u"auto_wl" not in qdict:
             lwa_options[u"auto_wl"] = u"off"
@@ -378,7 +382,7 @@ def make_history_dir():
 
 def to_c(temp_k):
     """ convert temperature in degrees kelvin to degrees celsius."""
-    temp_c = safe_float(temp_k) - 273.15
+    temp_c = temp_k - 273.15
     return temp_c
 
 
@@ -387,12 +391,15 @@ def to_f(temp_c):
     temp_F = round((temp_c * 1.8) + 32, 1)
     return temp_F
 
-
 def to_in(len_mm):
     """ convert length in milimeters to inches."""
-    len_in = round(safe_float(len_mm) // 25.4, 1)
+    len_in = round(safe_float(len_mm) * 0.03937, 1)
     return len_in
 
+def to_mm(len_in):
+    """ convert length in inches to milimeters."""
+    len_mm = round(safe_float(len_in) * 25.4, 0)
+    return len_mm 
 
 def options_data():
     """
@@ -480,7 +487,7 @@ def get_data(filename, suffix, data_type, options):
     while try_nr <= 2:
         try:
             with open(path, u"wb") as fh:
-                req = urllib.request.urlopen(url + u"&appid=" + options[u"apikey"])
+                req = urlopen(url + u"&appid=" + options[u"apikey"])
                 while True:
                     chunk = req.read(20480)
                     if not chunk:
@@ -505,7 +512,7 @@ def get_data(filename, suffix, data_type, options):
 
         except Exception as err:
             if try_nr < 2:
-                print(str(err), u"Retrying.")
+                print(str(err).encode('utf-8'), u"Retrying.")
                 os.remove(path)
                 # If we had an exception, this is where we need to increase
                 # our count retry
@@ -526,7 +533,7 @@ def history_info(obj, curr_conditions, options):
     time_now = datetime.datetime.now()
     day_delta = datetime.timedelta(days = float(options[u"days_history"]))
 
-    history = curr_conditions
+    history = dict(curr_conditions)
 
     path = u"./data/weather_level_history"
     i = 1
@@ -570,7 +577,6 @@ def history_info(obj, curr_conditions, options):
                     sys.stdout.write(
                         u"Unable to remove file {}: \n{}".format(filename, excp)
                     )
-
     return history
 
 
@@ -617,7 +623,7 @@ def today_info(obj, options):
                 data[u"weight"] = weight
                 break
         result = {
-            u"temp_c": safe_float(data[u"main"][u"temp"]) - 273.15,
+            u"temp_c": round(safe_float(data[u"main"][u"temp"]) - 273.15, 2),
             u"rain_mm": safe_float(precipd),
             u"wind_ms": safe_float(data[u"wind"][u"speed"]),
             u"humidity": safe_float(data[u"main"][u"humidity"]),
@@ -633,7 +639,6 @@ def today_info(obj, options):
         )
     except Exception:
         pass
-
     return result
 
 

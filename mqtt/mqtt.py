@@ -1,24 +1,31 @@
 # !/usr/bin/env python
-from __future__ import print_function
+
 
 """ SIP plugin adds an MQTT client to SIP for other plugins to broadcast and receive via MQTT
 The intent is to facilitate joining SIP to larger automation systems
-"""
 __author__ = "Daniel Casner <daniel@danielcasner.org>"
+"""
 
-import web  # web.py framework
-import gv  # Get access to SIP's settings
-from urls import urls  # Get access to SIP's URLs
-from sip import template_render  #  Needed for working with web.py templates
-from webpages import ProtectedPage  # Needed for security
-import json  # for working with data file
+# Python 2/3 compatibility imports
+from __future__ import print_function
+
+# standard library imports
 import atexit  # For publishing down message
+import json  # for working with data file
+
+# local module imports
+import gv  # Get access to SIP's settings
+from sip import template_render  #  Needed for working with web.py templates
+from urls import urls  # Get access to SIP's URLs
+import web  # web.py framework
+from webpages import ProtectedPage  # Needed for security
 
 try:
     import paho.mqtt.client as mqtt
 except ImportError:
     print(u"ERROR: MQTT Plugin requires paho mqtt.")
     print(u"\ttry: pip install paho-mqtt")
+    print(u"or for Python 3 pip3 install paho-mqtt ")
     mqtt = None
 
 DATA_FILE = u"./data/mqtt.json"
